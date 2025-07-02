@@ -109,3 +109,63 @@
 | 네비바        | 사용자는 페이지 상단의 네비바에서 자신의 로그인 정보를 확인할 수 있으며 버튼을 눌러서 로그아웃 할 수 있다.                       |
 | 네비바        | 사용자가 페이지 상단 네비바에서 로그아웃 버튼을 누를 경우 메인 페이지로 이동한다.                                       |
 | 사이드바      | 사용자는 좌측 사이드바를 통해 각 서비스 페이지로 이동할 수 있다.                                                     |
+
+## 프로젝트 배포
+- 오라클 클라우드 VM.Standard.E2.1.Micro(1core, 1gb) 환경에서 배포
+- 아파치2, PHP 8.1, mysql 설치
+
+### 1. 오라클 클라우드 컴퓨팅 인스턴스 생성
+![image](https://github.com/user-attachments/assets/410ba8d0-b5e8-4370-a781-2aa91600d417)
+- 인스턴스 페이지에서 인스턴스 생성 버튼을 클릭한다.
+
+![image](https://github.com/user-attachments/assets/ac4924d3-ecef-42a3-9d73-f77d739e4b5c)
+
+- 개발 편의를 위해 리눅스 os는 우분투를 사용했다. 구성의 경우 오라클 클라우드 프리티어에서 무료로 생성 가능한 E2.1 Micro를 선택한다. 1코어의 cpu와 1gb 메모리로 구성되어 있다.
+
+![image](https://github.com/user-attachments/assets/9bc306a0-1082-4731-a81e-c04fb1360ba5)
+- AWS의 Virtual Private Cloud (VPC)와 같은 역할을 하는 가상 클라우드 네트워크가 자동으로 생성된다. 이미 다른 인스턴스에서 만들어 놓은 VNIC가 존재하므로 그것을 사용하도록 했다.
+
+
+![image](https://github.com/user-attachments/assets/525eee5f-566e-4d3c-b99d-55810bf9b31a)
+- 컴퓨팅 인스턴스에 SSH 프로토콜을 이용해서 간편하게 접속하기 위해 SSH private key를 다운로드 받아야 한다.
+
+
+### 2. 오라클 클라우드 컴퓨팅 인스턴스 접속
+![image](https://github.com/user-attachments/assets/b06f83fc-4268-42a3-8c58-aad0752ea70d)
+
+- 인스턴스가 생성되면 인스턴스 세부 정보에 public IP를 확인할 수 있다. 해당 IP 주소를 이용해서 인스턴스에 SSH 방식으로 접속이 가능하다.
+- 터미널 프로그램은 termius 프로그램을 사용했다. 먼저 인스턴스 생성시 다운로드 받았던 SSH private key를 등록한다.
+- SSH의 기본 포트는 22 이다. 오라클 클라우드의 경우 우분투 os를 사용해서 인스턴스를 생성한 경우 초기 접속 시 사용자 이름은 ubuntu로 설정되어 있고 비밀번호는 입력하지 않아도 된다. 키의 경우 앞서 등록한 private key를 사용하도록 설정해주면 된다.
+
+### 3. 배포 환경 설정
+```bash
+sudo apt update
+sudo apt install apache2
+
+sudo apt-get install php
+sudo apt install mysql-server -y
+```
+- 패키지 매니저를 업데이트 시켜준 뒤 아파치와 PHP, mysql을 설치한다.
+- 새 프로그램 모두 윈도우 로컬 개발 환경에서 latest 버전을 설치했으므로 버전 호환성에 대한 고려 없이 자동으로 설치하도록 했다.
+
+![image](https://github.com/user-attachments/assets/9b93fea4-18e5-46dd-94a0-8803899279dc)
+```bash
+sudo iptables -L --line
+```
+- iptables는 Linux 시스템에서 네트워크 패킷을 필터링하고 전달하는 규칙을 설정하고 관리하는 데 사용된다.
+- iptables에서 'Chain INPUT'란에 REJECT된 부분을 삭제해서 비활성화를 제거한 뒤, 포트를 추가해서 열어줘야 한다.
+
+```bash
+sudo iptables -D INPUT 6
+sudo iptables -A INPUT -m state --state NEW -p tcp --dport 80 -j ACCEPT 
+sudo iptables -A INPUT -m state --state NEW -p tcp --dport 443 –j ACCEPT
+sudo iptables -A INPUT -m state --state NEW -p tcp --dport 3306 -j ACCEPT
+sudo netfilter-persistent save
+```
+- 80(http, 아파치), 443(https), 3306(mysql) 포트를 사용하므로 해당하는 포트를 열어준다.
+- 서버가 재시작 되면 방화벽 설정이 초기화 될 수 있으므로 변경 사항을 iptables 구성 파일에 저장한다.
+
+
+![image](https://github.com/user-attachments/assets/a923595c-2654-4371-a602-0dd010459cc0)
+
+- 인스턴스-서브넷-보안목록-수신규칙 추가 에서 사용해야 하는 포트를 추가했다.
